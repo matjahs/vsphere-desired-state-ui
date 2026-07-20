@@ -1,0 +1,6 @@
+/* Minimal globals — Material UI CssBaseline handles base styles */
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
