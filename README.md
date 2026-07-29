@@ -6,7 +6,7 @@ Next.js + **Material UI** app for comparing and rectifying vSphere Desired State
 
 - **Import / export** Desired State JSON (vCenter-compatible)
 - **MUI X DataGrid** compare matrix with quick filter, sort, pagination, and row coloring (drift / host-local / match / missing)
-- **Rectify tools**: copy from host, apply to all, promote to profile, majority vote, prune redundant overrides, demote to host-specific
+- **Rectify tools**: copy from host, apply to all, promote to profile, majority vote, prune redundant overrides, make override / make host-specific
 - **Profile / host / JSON editors** with AJV schema validation on export
 
 ## Quick start
