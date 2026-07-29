@@ -10,7 +10,8 @@ export default function HostsPage() {
         <Typography variant="h6">Hosts</Typography>
         <Typography variant="body2" color="text.secondary">
           Browse effective configuration for each host (profile + override +
-          specific).
+          specific). On a host detail page, select paths to make override or
+          host-specific.
         </Typography>
       </div>
       <HostsList />

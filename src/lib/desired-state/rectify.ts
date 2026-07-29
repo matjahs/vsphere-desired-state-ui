@@ -107,23 +107,67 @@ export function promoteToProfile(
   return next;
 }
 
-/** Move a host-local path from override into host-specific. */
+/**
+ * Pin each host's effective value on host-override and clear the same path
+ * from host-specific (so the layer is unambiguously "override").
+ */
+export function setAsOverride(
+  doc: DesiredStateDocument,
+  hostIds: string[],
+  path: string,
+): DesiredStateDocument {
+  let next = structuredClone(doc);
+  for (const hostId of hostIds) {
+    const value = getValueAtPath(resolveHost(next, hostId), path);
+    if (value === undefined) continue;
+
+    const override = ensureOverride(next, hostId);
+    next["host-override"]![hostId] = setValueAtPath(override, path, value);
+
+    if (next["host-specific"]?.[hostId]) {
+      next["host-specific"][hostId] = deleteValueAtPath(
+        next["host-specific"][hostId],
+        path,
+      );
+    }
+  }
+  return next;
+}
+
+/**
+ * Pin each host's effective value on host-specific and clear the same path
+ * from host-override (so the layer is unambiguously "specific").
+ */
+export function setAsHostSpecific(
+  doc: DesiredStateDocument,
+  hostIds: string[],
+  path: string,
+): DesiredStateDocument {
+  let next = structuredClone(doc);
+  for (const hostId of hostIds) {
+    const value = getValueAtPath(resolveHost(next, hostId), path);
+    if (value === undefined) continue;
+
+    const specific = ensureSpecific(next, hostId);
+    next["host-specific"]![hostId] = setValueAtPath(specific, path, value);
+
+    if (next["host-override"]?.[hostId]) {
+      next["host-override"][hostId] = deleteValueAtPath(
+        next["host-override"][hostId],
+        path,
+      );
+    }
+  }
+  return next;
+}
+
+/** Move a path from override into host-specific for one host (legacy helper). */
 export function demoteToHostSpecific(
   doc: DesiredStateDocument,
   hostId: string,
   path: string,
 ): DesiredStateDocument {
-  const next = structuredClone(doc);
-  const override = next["host-override"]?.[hostId];
-  if (!override) return next;
-
-  const value = getValueAtPath(override, path);
-  if (value === undefined) return next;
-
-  const specific = ensureSpecific(next, hostId);
-  next["host-specific"]![hostId] = setValueAtPath(specific, path, value);
-  next["host-override"]![hostId] = deleteValueAtPath(override, path);
-  return next;
+  return setAsHostSpecific(doc, [hostId], path);
 }
 
 /** Remove override leaf when it equals profile. */

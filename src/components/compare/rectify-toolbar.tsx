@@ -20,11 +20,13 @@ import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import {
   applyValueToHosts,
   copyFromHost,
-  demoteToHostSpecific,
   majorityVote,
   promoteToProfile,
   pruneAllRedundant,
+  setAsHostSpecific,
+  setAsOverride,
 } from "@/lib/desired-state/rectify";
+import { isHostLocalPath } from "@/lib/desired-state/identity";
 import { parseConfigPath } from "@/lib/desired-state/path-format";
 import { getHostInfo, resolveHost, getValueAtPath } from "@/lib/desired-state/resolve";
 import type { DesiredStateDocument, DiffRow } from "@/lib/desired-state/types";
@@ -318,28 +320,56 @@ export function RectifyToolbar({
         >
           Prune redundant
         </Button>
+
+        <Divider sx={{ my: 1 }} />
+        <Typography variant="caption" color="text.secondary" sx={{ px: 0.5 }}>
+          Layer assignment
+          {!multi && isHostLocalPath(primary.path)
+            ? " · host-local → prefer specific"
+            : !multi
+              ? " · shared exception → prefer override"
+              : ""}
+        </Typography>
+
         <Button
           fullWidth
-          variant="outlined"
+          variant="contained"
+          color="warning"
           onClick={() =>
             run(
               multi
-                ? `Demoted to host-specific (${paths.length} paths)`
-                : "Demoted host-local from overrides",
+                ? `Set as override (${paths.length} paths)`
+                : "Set as host override",
               () =>
                 updateDocument((doc) =>
-                  applyToAllPaths(doc, paths, (d, path) => {
-                    let next = d;
-                    for (const id of selectedHostIds) {
-                      next = demoteToHostSpecific(next, id, path);
-                    }
-                    return next;
-                  }),
+                  applyToAllPaths(doc, paths, (d, path) =>
+                    setAsOverride(d, selectedHostIds, path),
+                  ),
                 ),
             )
           }
         >
-          Demote to host-specific
+          Make override
+        </Button>
+        <Button
+          fullWidth
+          variant="contained"
+          color="info"
+          onClick={() =>
+            run(
+              multi
+                ? `Set as host-specific (${paths.length} paths)`
+                : "Set as host-specific",
+              () =>
+                updateDocument((doc) =>
+                  applyToAllPaths(doc, paths, (d, path) =>
+                    setAsHostSpecific(d, selectedHostIds, path),
+                  ),
+                ),
+            )
+          }
+        >
+          Make host-specific
         </Button>
       </Stack>
 

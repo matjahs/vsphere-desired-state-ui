@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Alert,
+  Button,
   Card,
   CardActionArea,
   CardContent,
@@ -17,8 +18,14 @@ import {
   DataGrid,
   GridColDef,
   GridRenderCellParams,
+  GridRowSelectionModel,
 } from "@mui/x-data-grid";
+import { isHostLocalPath } from "@/lib/desired-state/identity";
 import { flattenLeaves } from "@/lib/desired-state/diff";
+import {
+  setAsHostSpecific,
+  setAsOverride,
+} from "@/lib/desired-state/rectify";
 import {
   getLayerForPath,
   listHosts,
@@ -49,18 +56,21 @@ export function HostsList() {
           <Card variant="outlined">
             <CardActionArea component={Link} href={`/hosts/${host.uuid}`}>
               <CardContent>
-                <Typography variant="subtitle1"
-            sx={{ fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   {host.displayName}
                 </Typography>
                 <Typography
                   variant="caption"
                   color="text.secondary"
-            sx={{ display: "block", mt: 0.5, fontFamily: "var(--font-geist-mono), monospace" }}>
+                  sx={{
+                    display: "block",
+                    mt: 0.5,
+                    fontFamily: "var(--font-geist-mono), monospace",
+                  }}
+                >
                   {host.uuid}
                 </Typography>
-                <Stack direction="row" spacing={1}
-              sx={{ mt: 2 }}>
+                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                   <Chip
                     size="small"
                     label={
@@ -107,7 +117,9 @@ interface HostLeafRow {
 }
 
 export function HostDetail({ uuid }: { uuid: string }) {
-  const { document } = useDocumentStore();
+  const { document, updateDocument } = useDocumentStore();
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
 
   const host = useMemo(() => {
     if (!document) return null;
@@ -139,7 +151,8 @@ export function HostDetail({ uuid }: { uuid: string }) {
             variant="caption"
             noWrap
             title={params.value as string}
-            sx={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+            sx={{ fontFamily: "var(--font-geist-mono), monospace" }}
+          >
             {params.value as string}
           </Typography>
         ),
@@ -177,7 +190,8 @@ export function HostDetail({ uuid }: { uuid: string }) {
             variant="caption"
             noWrap
             title={params.value as string}
-            sx={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+            sx={{ fontFamily: "var(--font-geist-mono), monospace" }}
+          >
             {params.value as string}
           </Typography>
         ),
@@ -185,6 +199,26 @@ export function HostDetail({ uuid }: { uuid: string }) {
     ],
     [],
   );
+
+  const selectionModel: GridRowSelectionModel = {
+    type: "include",
+    ids: new Set(selectedPaths),
+  };
+
+  const selectedCount = selectedPaths.length;
+  const hint =
+    selectedCount === 1 && isHostLocalPath(selectedPaths[0])
+      ? "Host-local path — prefer specific"
+      : selectedCount === 1
+        ? "Shared setting — prefer override for exceptions"
+        : selectedCount > 1
+          ? `${selectedCount} paths selected`
+          : "Select rows to reassign layer";
+
+  function run(label: string, fn: () => void) {
+    fn();
+    setMessage(label);
+  }
 
   if (!document) {
     return (
@@ -209,9 +243,81 @@ export function HostDetail({ uuid }: { uuid: string }) {
         <Typography
           variant="caption"
           color="text.secondary"
-            sx={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+          sx={{ fontFamily: "var(--font-geist-mono), monospace" }}
+        >
           {host.uuid}
         </Typography>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {hint}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              variant="contained"
+              color="warning"
+              disabled={selectedCount === 0}
+              onClick={() =>
+                run(
+                  selectedCount === 1
+                    ? "Set as host override"
+                    : `Set as override (${selectedCount} paths)`,
+                  () => {
+                    updateDocument((doc) => {
+                      let next = doc;
+                      for (const path of selectedPaths) {
+                        next = setAsOverride(next, [uuid], path);
+                      }
+                      return next;
+                    });
+                  },
+                )
+              }
+            >
+              Make override
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="info"
+              disabled={selectedCount === 0}
+              onClick={() =>
+                run(
+                  selectedCount === 1
+                    ? "Set as host-specific"
+                    : `Set as host-specific (${selectedCount} paths)`,
+                  () => {
+                    updateDocument((doc) => {
+                      let next = doc;
+                      for (const path of selectedPaths) {
+                        next = setAsHostSpecific(next, [uuid], path);
+                      }
+                      return next;
+                    });
+                  },
+                )
+              }
+            >
+              Make host-specific
+            </Button>
+          </Stack>
+        </Stack>
+        {message && (
+          <Alert
+            severity="success"
+            sx={{ mt: 1.5 }}
+            onClose={() => setMessage(null)}
+          >
+            {message}
+          </Alert>
+        )}
       </Paper>
 
       <Paper variant="outlined" sx={{ height: "70vh", width: "100%" }}>
@@ -220,9 +326,20 @@ export function HostDetail({ uuid }: { uuid: string }) {
           columns={columns}
           density="compact"
           showToolbar
+          checkboxSelection
+          disableRowSelectionOnClick={false}
+          keepNonExistentRowsSelected
+          rowSelectionModel={selectionModel}
+          onRowSelectionModelChange={(model) => {
+            const ids = [...model.ids].map(String);
+            const prev = selectedPaths.filter((p) => ids.includes(p));
+            const added = ids.filter((p) => !selectedPaths.includes(p));
+            setSelectedPaths([...prev, ...added]);
+          }}
           pageSizeOptions={[25, 50, 100]}
           initialState={{
             pagination: { paginationModel: { pageSize: 50 } },
+            sorting: { sortModel: [{ field: "layer", sort: "asc" }] },
           }}
           slotProps={{
             toolbar: {

@@ -12,6 +12,9 @@ import {
   pruneRedundantOverride,
   resolveHost,
   applyValueToHosts,
+  setAsHostSpecific,
+  setAsOverride,
+  getLayerForPath,
   type DesiredStateDocument,
 } from "./index";
 
@@ -120,5 +123,34 @@ describe("rectify", () => {
       ? flattenLeaves(doc["host-override"]![hostId]).get("esx.system.system_time.enabled")
       : undefined;
     expect(overrideVal).toBeUndefined();
+  });
+
+  it("setAsOverride pins effective value and clears specific", () => {
+    const hostId = "3d864d56-6cea-7a4b-fcec-8eaf186486c0";
+    const path = "esx.network.net_stacks[defaultTcpipStack].host_name";
+    // hostname currently lives under host-specific in the sample
+    expect(getLayerForPath(sample, hostId, path)).toBe("specific");
+
+    const next = setAsOverride(sample, [hostId], path);
+    expect(getLayerForPath(next, hostId, path)).toBe("override");
+    expect(
+      flattenLeaves(next["host-specific"]![hostId]).get(path),
+    ).toBeUndefined();
+    expect(flattenLeaves(resolveHost(next, hostId)).get(path)).toBe(
+      flattenLeaves(resolveHost(sample, hostId)).get(path),
+    );
+  });
+
+  it("setAsHostSpecific pins effective value and clears override", () => {
+    const hostId = "18134d56-be81-cc35-71e7-e8830feced96";
+    const path = "esx.network.vmknics[vmk0].ip.ipv4_address";
+    expect(getLayerForPath(sample, hostId, path)).toBe("override");
+
+    const next = setAsHostSpecific(sample, [hostId], path);
+    expect(getLayerForPath(next, hostId, path)).toBe("specific");
+    expect(
+      flattenLeaves(next["host-override"]![hostId]).get(path),
+    ).toBeUndefined();
+    expect(flattenLeaves(resolveHost(next, hostId)).get(path)).toBe("10.1.1.103");
   });
 });
