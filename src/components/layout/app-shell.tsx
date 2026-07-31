@@ -27,6 +27,7 @@ import { validateDocument } from "@/lib/desired-state/validate";
 
 const NAV = [
   { href: "/", label: "Compare" },
+  { href: "/diff", label: "Diff" },
   { href: "/profile", label: "Profile" },
   { href: "/hosts", label: "Hosts" },
   { href: "/json", label: "JSON" },
@@ -130,10 +131,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {NAV.map((item) => (
               <Tab
                 key={item.href}
-                label={item.label}
+                label={
+                  item.href === "/diff" && dirty
+                    ? `${item.label}*`
+                    : item.label
+                }
                 component={Link}
                 href={item.href}
-                sx={{ minHeight: 40, py: 0 }}
+                sx={{
+                  minHeight: 40,
+                  py: 0,
+                  color: item.href === "/diff" && dirty ? "warning.main" : undefined,
+                }}
               />
             ))}
           </Tabs>
@@ -199,9 +208,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            {document
-              ? `${fileName ?? "untitled"}${dirty ? " • unsaved" : ""}`
-              : "No document loaded"}
+            {document ? (
+              <>
+                {fileName ?? "untitled"}
+                {dirty ? (
+                  <>
+                    {" • "}
+                    <Box
+                      component={Link}
+                      href="/diff"
+                      sx={{
+                        color: "warning.main",
+                        textDecoration: "underline",
+                        textUnderlineOffset: 2,
+                      }}
+                    >
+                      unsaved
+                    </Box>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              "No document loaded"
+            )}
           </Typography>
           {status && (
             <Chip size="small" color="info" variant="outlined" label={status} />

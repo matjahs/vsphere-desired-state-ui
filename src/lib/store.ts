@@ -9,6 +9,8 @@ const MAX_HISTORY = 50;
 
 interface DocumentState {
   document: DesiredStateDocument | null;
+  /** Snapshot from load / last successful export — Diff page compares against this. */
+  baseline: DesiredStateDocument | null;
   fileName: string | null;
   selectedHostIds: string[];
   history: DesiredStateDocument[];
@@ -37,6 +39,7 @@ function pushHistory(
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   document: null,
+  baseline: null,
   fileName: null,
   selectedHostIds: [],
   history: [],
@@ -45,8 +48,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   loadDocument: (doc, fileName) => {
     const hostIds = listHostIds(doc).slice(0, 4);
+    const snapshot = structuredClone(doc);
     set({
-      document: structuredClone(doc),
+      document: snapshot,
+      baseline: structuredClone(doc),
       fileName: fileName ?? "desired-state.json",
       selectedHostIds: hostIds.length >= 2 ? hostIds : hostIds,
       history: [],
@@ -117,6 +122,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   clear: () =>
     set({
       document: null,
+      baseline: null,
       fileName: null,
       selectedHostIds: [],
       history: [],
@@ -124,7 +130,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       dirty: false,
     }),
 
-  markClean: () => set({ dirty: false }),
+  markClean: () => {
+    const { document } = get();
+    set({
+      dirty: false,
+      baseline: document ? structuredClone(document) : null,
+    });
+  },
 }));
 
 export function downloadDocument(doc: DesiredStateDocument, fileName?: string) {
