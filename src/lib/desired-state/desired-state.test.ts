@@ -15,6 +15,8 @@ import {
   setAsHostSpecific,
   setAsOverride,
   getLayerForPath,
+  diffDocumentChanges,
+  summarizeChanges,
   type DesiredStateDocument,
 } from "./index";
 
@@ -152,5 +154,32 @@ describe("rectify", () => {
       flattenLeaves(next["host-override"]![hostId]).get(path),
     ).toBeUndefined();
     expect(flattenLeaves(resolveHost(next, hostId)).get(path)).toBe("10.1.1.103");
+  });
+});
+describe("diffDocumentChanges", () => {
+  it("returns empty when documents are equal", () => {
+    const rows = diffDocumentChanges(sample, structuredClone(sample));
+    expect(rows).toHaveLength(0);
+    expect(summarizeChanges(rows).total).toBe(0);
+  });
+
+  it("classifies changed leaves after override edit", () => {
+    const hostId = "18134d56-be81-cc35-71e7-e8830feced96";
+    const path = "esx.network.vmknics[vmk0].mtu";
+    const current = applyValueToHosts(sample, [hostId], path, 9000);
+
+    const rows = diffDocumentChanges(sample, current);
+    expect(rows.length).toBeGreaterThan(0);
+
+    const match = rows.find(
+      (r) => r.path.includes("vmknics[vmk0].mtu") && r.path.includes(hostId),
+    );
+    expect(match).toBeDefined();
+    expect(match!.kind).toBe("changed");
+    expect(match!.after).toBe(9000);
+
+    const summary = summarizeChanges(rows);
+    expect(summary.changed).toBeGreaterThanOrEqual(1);
+    expect(summary.added + summary.removed + summary.changed).toBe(summary.total);
   });
 });
