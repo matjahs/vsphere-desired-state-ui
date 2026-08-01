@@ -19,6 +19,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000), click **Sample** to load the included export, select 2–4 hosts, and review drift.
 
+### Docker / lab
+
+```bash
+docker compose up --build
+# or
+docker buildx build --platform linux/amd64 \
+  -t nexus.lab.mxe11.nl/tools/vsphere-desired-state-ui:0.1.0 --push .
+```
+
+Homelab: https://desired-state.lab.mxe11.nl (GitOps in `matjahs/synology-k3s` → `apps/desired-state`).
+
 ## Scripts
 
 | Command | Description |
